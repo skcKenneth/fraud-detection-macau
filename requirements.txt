@@ -1,0 +1,15 @@
+streamlit
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+plotly
+networkx
+xgboost
+scipy
+opendatasets
+kaggle                # Kaggle API (optional)
+torch                 # PyTorch for neural networks
+torch-geometric       # Graph neural networks
+shap                  # Explainable AI
+transformers          # Hugging Face transformers

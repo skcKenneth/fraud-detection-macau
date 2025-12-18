@@ -75,10 +75,19 @@ class FederatedLearning:
                 if importance is not None:
                     if isinstance(importance, dict):
                         importance = list(importance.values())
+                    # Ensure importance is a list/array
+                    if not isinstance(importance, (list, np.ndarray)):
+                        continue
                     all_importances.append(importance)
                     participating_banks.append(bank)
         
         if all_importances:
+            # Ensure all importances have the same length
+            lengths = [len(imp) for imp in all_importances]
+            if len(set(lengths)) > 1:
+                # Use the minimum length to avoid errors
+                min_len = min(lengths)
+                all_importances = [imp[:min_len] if len(imp) > min_len else imp for imp in all_importances]
             # Average feature importances
             avg_importance = np.mean(all_importances, axis=0)
             

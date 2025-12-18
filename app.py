@@ -307,9 +307,16 @@ if page == "📊 實時監控":
     
     display_df.columns = ['交易ID', '時間', '來源帳戶', '目標帳戶', 
                           f'金額 ({CURRENCY})', '跨境', '欺詐概率', '狀態']
-    display_df[f'金額 ({CURRENCY})'] = display_df[f'金額 ({CURRENCY})'].apply(lambda x: f"{x:,.2f}")
-    display_df['欺詐概率'] = display_df['欺詐概率'].apply(lambda x: f"{x:.1%}")
-    display_df['跨境'] = display_df['跨境'].map({0: '否', 1: '是'})
+    # Format amount safely
+    display_df[f'金額 ({CURRENCY})'] = display_df[f'金額 ({CURRENCY})'].apply(
+        lambda x: f"{float(x):,.2f}" if pd.notna(x) and isinstance(x, (int, float)) else "0.00"
+    )
+    # Format fraud probability safely
+    display_df['欺詐概率'] = display_df['欺詐概率'].apply(
+        lambda x: f"{float(x):.1%}" if pd.notna(x) and isinstance(x, (int, float)) else "0.0%"
+    )
+    # Map cross-border safely
+    display_df['跨境'] = display_df['跨境'].map({0: '否', 1: '是'}).fillna('未知')
     
     st.dataframe(
         display_df.style.map(color_risk, subset=['狀態']),
@@ -343,7 +350,7 @@ if page == "📊 實時監控":
             height=CHART_HEIGHT,
             showlegend=False
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.subheader("🌍 跨境交易分析")
@@ -364,7 +371,7 @@ if page == "📊 實時監控":
             color_discrete_map={'正常': '#4caf50', '欺詐': '#f44336'},
             height=CHART_HEIGHT
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # Feature importance
     st.subheader("🎯 特徵重要性分析")
@@ -388,7 +395,7 @@ if page == "📊 實時監控":
             height=400,
             showlegend=False
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # Enhanced Analytics Section
     st.markdown("---")
@@ -421,15 +428,29 @@ if page == "📊 實時監控":
         
         with st.spinner("正在計算風險分佈..."):
             # Create risk heatmap data
+            if len(data) == 0:
+                st.warning("沒有可用數據")
+                st.stop()
             risk_data = data.sample(min(1000, len(data)))  # Sample for performance
             
             # Calculate fraud probability for the sample
             features_sample = models['fraud_detector'].prepare_features(risk_data)
             fraud_proba_sample = models['fraud_detector'].predict_proba(features_sample)
+            risk_data = risk_data.copy()
             risk_data['fraud_probability'] = fraud_proba_sample
         
-        risk_data['hour'] = pd.to_datetime(risk_data['timestamp']).dt.hour
-        risk_data['day_of_week'] = pd.to_datetime(risk_data['timestamp']).dt.dayofweek
+        # Safely extract hour and day_of_week
+        if 'timestamp' in risk_data.columns:
+            try:
+                risk_data['hour'] = pd.to_datetime(risk_data['timestamp'], errors='coerce').dt.hour.fillna(12)
+                risk_data['day_of_week'] = pd.to_datetime(risk_data['timestamp'], errors='coerce').dt.dayofweek.fillna(0)
+            except Exception as e:
+                st.warning(f"時間戳解析錯誤: {e}")
+                risk_data['hour'] = 12
+                risk_data['day_of_week'] = 0
+        else:
+            risk_data['hour'] = 12
+            risk_data['day_of_week'] = 0
         
         # Create pivot table for heatmap
         heatmap_data = risk_data.groupby(['hour', 'day_of_week'])['fraud_probability'].mean().unstack()
@@ -449,7 +470,7 @@ if page == "📊 實時監控":
             yaxis_title="小時",
             height=500
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with tab2:
         st.subheader("🔗 特徵相關性分析")
@@ -484,7 +505,7 @@ if page == "📊 實時監控":
             yaxis_title="特徵",
             height=500
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Feature importance insights
         st.subheader("💡 關鍵洞察")
@@ -504,10 +525,13 @@ if page == "📊 實時監控":
         
         with col2:
             st.markdown("**與欺詐最相關的特徵:**")
-            fraud_corr = corr_data['fraud_probability'].abs().sort_values(ascending=False)
-            for feat, corr in fraud_corr.head(5).items():
-                if feat != 'fraud_probability':
-                    st.write(f"• {feat}: {corr:.3f}")
+            if 'fraud_probability' in corr_data.columns:
+                fraud_corr = corr_data['fraud_probability'].abs().sort_values(ascending=False)
+                for feat, corr in fraud_corr.head(5).items():
+                    if feat != 'fraud_probability':
+                        st.write(f"• {feat}: {corr:.3f}")
+            else:
+                st.write("• 無可用數據")
     
     with tab3:
         st.subheader("📈 交易趨勢分析")
@@ -572,49 +596,59 @@ if page == "📊 實時監控":
         )
         
         fig.update_layout(height=600, showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Forecasting (simple linear trend)
         st.subheader("🔮 風險預測")
         if len(daily_stats) > 7:
-            from sklearn.linear_model import LinearRegression
-            
-            # Prepare data for forecasting
-            X = np.arange(len(daily_stats)).reshape(-1, 1)
-            y = daily_stats['平均風險'].values
-            
-            # Fit model
-            model = LinearRegression()
-            model.fit(X, y)
-            
-            # Predict next 7 days
-            future_days = np.arange(len(daily_stats), len(daily_stats) + 7).reshape(-1, 1)
-            predictions = model.predict(future_days)
-            
-            # Create forecast plot
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=daily_stats['date'], 
-                y=daily_stats['平均風險'],
-                name='歷史數據',
-                line=dict(color='blue')
-            ))
-            
-            future_dates = pd.date_range(start=daily_stats['date'].iloc[-1], periods=8, freq='D')[1:]
-            fig.add_trace(go.Scatter(
-                x=future_dates,
-                y=predictions,
-                name='預測',
-                line=dict(color='red', dash='dash')
-            ))
-            
-            fig.update_layout(
-                title="欺詐風險趨勢預測 (未來7天)",
-                xaxis_title="日期",
-                yaxis_title="平均欺詐風險",
-                height=400
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            try:
+                from sklearn.linear_model import LinearRegression
+                
+                # Prepare data for forecasting
+                X = np.arange(len(daily_stats)).reshape(-1, 1)
+                y = daily_stats['平均風險'].values
+                
+                # Check for valid data
+                if len(y) > 0 and not np.isnan(y).all():
+                    # Fit model
+                    model = LinearRegression()
+                    model.fit(X, y)
+                    
+                    # Predict next 7 days
+                    future_days = np.arange(len(daily_stats), len(daily_stats) + 7).reshape(-1, 1)
+                    predictions = model.predict(future_days)
+                    
+                    # Create forecast plot
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=daily_stats['date'], 
+                        y=daily_stats['平均風險'],
+                        name='歷史數據',
+                        line=dict(color='blue')
+                    ))
+                    
+                    if len(daily_stats) > 0:
+                        future_dates = pd.date_range(start=daily_stats['date'].iloc[-1], periods=8, freq='D')[1:]
+                        fig.add_trace(go.Scatter(
+                            x=future_dates,
+                            y=predictions,
+                            name='預測',
+                            line=dict(color='red', dash='dash')
+                        ))
+                    
+                    fig.update_layout(
+                        title="欺詐風險趨勢預測 (未來7天)",
+                        xaxis_title="日期",
+                        yaxis_title="平均欺詐風險",
+                        height=400
+                    )
+                    st.plotly_chart(fig, width='stretch')
+                else:
+                    st.info("數據不足，無法進行預測")
+            except Exception as e:
+                st.warning(f"預測失敗: {str(e)}")
+        else:
+            st.info("需要至少7天的數據才能進行預測")
     
     with tab4:
         st.subheader("🎯 異常交易檢測")
@@ -626,7 +660,12 @@ if page == "📊 實時監控":
             # Prepare features for anomaly detection
             anomaly_features = ['amount', 'location_risk', 'behavioral_score', 
                                'transactions_last_hour', 'amount_last_24h']
-            X_anomaly = data[anomaly_features].fillna(0)
+            # Only use features that exist in the data
+            available_anomaly_features = [f for f in anomaly_features if f in data.columns]
+            if not available_anomaly_features:
+                st.error("沒有可用的異常檢測特徵")
+                st.stop()
+            X_anomaly = data[available_anomaly_features].fillna(0)
             
             # Fit isolation forest
             iso_forest = IsolationForest(contamination=0.1, random_state=42)
@@ -646,8 +685,10 @@ if page == "📊 實時監控":
         col1, col2 = st.columns(2)
         
         with col1:
-            st.metric("檢測到的異常交易", f"{data_anomaly['is_anomaly'].sum()}", 
-                     f"{data_anomaly['is_anomaly'].sum()/len(data_anomaly)*100:.1f}%")
+            anomaly_count = int(data_anomaly['is_anomaly'].sum()) if 'is_anomaly' in data_anomaly.columns else 0
+            anomaly_pct = (anomaly_count / len(data_anomaly) * 100) if len(data_anomaly) > 0 else 0.0
+            st.metric("檢測到的異常交易", f"{anomaly_count}", 
+                     f"{anomaly_pct:.1f}%")
         
         with col2:
             st.metric("異常檢測準確率", "94.2%", "+2.1%")
@@ -655,25 +696,29 @@ if page == "📊 實時監控":
         # Anomaly visualization
         fig = go.Figure()
         
-        # Normal transactions
-        normal_data = data_anomaly[~data_anomaly['is_anomaly']]
-        fig.add_trace(go.Scatter(
-            x=normal_data['amount'],
-            y=normal_data['anomaly_score'],
-            mode='markers',
-            name='正常交易',
-            marker=dict(color='blue', size=4, opacity=0.6)
-        ))
-        
-        # Anomalous transactions
-        anomaly_data = data_anomaly[data_anomaly['is_anomaly']]
-        fig.add_trace(go.Scatter(
-            x=anomaly_data['amount'],
-            y=anomaly_data['anomaly_score'],
-            mode='markers',
-            name='異常交易',
-            marker=dict(color='red', size=8, opacity=0.8)
-        ))
+        # Check if required columns exist
+        if 'is_anomaly' in data_anomaly.columns and 'anomaly_score' in data_anomaly.columns and 'amount' in data_anomaly.columns:
+            # Normal transactions
+            normal_data = data_anomaly[~data_anomaly['is_anomaly']]
+            if len(normal_data) > 0:
+                fig.add_trace(go.Scatter(
+                    x=normal_data['amount'],
+                    y=normal_data['anomaly_score'],
+                    mode='markers',
+                    name='正常交易',
+                    marker=dict(color='blue', size=4, opacity=0.6)
+                ))
+            
+            # Anomalous transactions
+            anomaly_data = data_anomaly[data_anomaly['is_anomaly']]
+            if len(anomaly_data) > 0:
+                fig.add_trace(go.Scatter(
+                    x=anomaly_data['amount'],
+                    y=anomaly_data['anomaly_score'],
+                    mode='markers',
+                    name='異常交易',
+                    marker=dict(color='red', size=8, opacity=0.8)
+                ))
         
         fig.update_layout(
             title="異常交易檢測結果",
@@ -681,14 +726,24 @@ if page == "📊 實時監控":
             yaxis_title="異常分數",
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Top anomalies
         st.subheader("🚨 高風險異常交易")
-        top_anomalies = data_anomaly[data_anomaly['is_anomaly']].nlargest(10, 'anomaly_score')[
-            ['transaction_id', 'amount', 'anomaly_score', 'fraud_probability', 'timestamp']
-        ]
-        st.dataframe(top_anomalies, width='stretch')
+        if 'is_anomaly' in data_anomaly.columns and 'anomaly_score' in data_anomaly.columns:
+            anomaly_data = data_anomaly[data_anomaly['is_anomaly']]
+            if len(anomaly_data) > 0:
+                display_cols = ['transaction_id', 'amount', 'anomaly_score', 'fraud_probability', 'timestamp']
+                available_cols = [col for col in display_cols if col in anomaly_data.columns]
+                if available_cols:
+                    top_anomalies = anomaly_data.nlargest(10, 'anomaly_score')[available_cols]
+                    st.dataframe(top_anomalies, width='stretch')
+                else:
+                    st.info("無可用列顯示")
+            else:
+                st.info("未檢測到異常交易")
+        else:
+            st.info("異常檢測數據不可用")
 
 # ============================================================================
 # PAGE 2: Deepfake Detection (深度偽造檢測)
@@ -760,7 +815,7 @@ elif page == "🎭 深度偽造檢測":
                     }
                 ))
                 fig.update_layout(height=300)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.subheader("📹 視頻分析")
@@ -805,7 +860,7 @@ elif page == "🎭 深度偽造檢測":
                     }
                 ))
                 fig.update_layout(height=300)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
     
     # Statistics
     st.markdown("---")
@@ -828,7 +883,7 @@ elif page == "🎭 深度偽造檢測":
             color_discrete_sequence=px.colors.qualitative.Set3,
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.dataframe(
@@ -1236,7 +1291,7 @@ elif page == "🤝 聯邦學習":
             height=CHART_HEIGHT,
             yaxis=dict(tickformat='.0%', range=[0.85, 1.0])
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         st.success("""
         💡 **聯邦學習效果:**  
@@ -1313,7 +1368,7 @@ elif page == "🧠 混合AI系統":
                     yaxis_title="特徵",
                     height=400
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
     
     with tab2:
         st.subheader("📊 SHAP解釋分析")
@@ -1374,7 +1429,7 @@ elif page == "🧠 混合AI系統":
                         yaxis_title="特徵",
                         height=400
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                     
                     # Individual prediction explanations
                     st.subheader("🔍 個別預測解釋")
@@ -1496,7 +1551,7 @@ elif page == "🧠 混合AI系統":
             yaxis_title="帳戶ID",
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with tab4:
         st.subheader("⚡ 實時預測分析")
@@ -1520,7 +1575,7 @@ elif page == "🧠 混合AI系統":
                 )
                 
                 # Display results
-                st.dataframe(results_df, use_container_width=True)
+                st.dataframe(results_df, width='stretch')
                 
                 # Prediction statistics
                 col1, col2, col3 = st.columns(3)
@@ -1570,7 +1625,7 @@ elif page == "🧠 混合AI系統":
             barmode='group',
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 # Footer
 st.markdown("---")

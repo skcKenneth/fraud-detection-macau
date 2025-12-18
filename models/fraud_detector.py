@@ -44,14 +44,22 @@ class EnsembleFraudDetector:
         features = pd.DataFrame()
         
         # Amount-based features
-        if 'amount' in df.columns:
-            features['amount'] = df['amount']
-            features['log_amount'] = np.log1p(df['amount'])
+        if 'amount' in df.columns and len(df) > 0:
+            features['amount'] = df['amount'].fillna(0)
+            features['log_amount'] = np.log1p(features['amount'])
             
             # Calculate z-score for amount
-            amount_mean = df['amount'].mean() if len(df) > 1 else df['amount'].iloc[0]
-            amount_std = df['amount'].std() if len(df) > 1 else 1.0
-            features['amount_zscore'] = (df['amount'] - amount_mean) / (amount_std + 1e-6)
+            if len(df) > 1:
+                amount_mean = df['amount'].mean()
+                amount_std = df['amount'].std()
+                if pd.isna(amount_mean):
+                    amount_mean = 0.0
+                if pd.isna(amount_std) or amount_std == 0:
+                    amount_std = 1.0
+            else:
+                amount_mean = df['amount'].iloc[0] if len(df) > 0 else 0.0
+                amount_std = 1.0
+            features['amount_zscore'] = (features['amount'] - amount_mean) / (amount_std + 1e-6)
         else:
             # Create dummy amount features
             features['amount'] = np.random.uniform(10, 1000, len(df))

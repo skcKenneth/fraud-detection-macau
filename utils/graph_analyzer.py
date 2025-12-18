@@ -305,9 +305,11 @@ class MoneyLaunderingDetector:
                 
                 # Calculate total amounts
                 total_sent = sum(self.graph[account][neighbor]['amount'] 
-                               for neighbor in self.graph.successors(account))
+                               for neighbor in self.graph.successors(account)
+                               if self.graph.has_edge(account, neighbor))
                 total_received = sum(self.graph[neighbor][account]['amount'] 
-                                   for neighbor in self.graph.predecessors(account))
+                                   for neighbor in self.graph.predecessors(account)
+                                   if self.graph.has_edge(neighbor, account))
                 
                 risk_scores.append({
                     'account': account,

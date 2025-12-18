@@ -346,8 +346,15 @@ class HybridAISystem:
         if not self.is_trained:
             raise ValueError("Model not trained yet")
         
+        if self.explainer is None:
+            raise ValueError("SHAP explainer not initialized. Please train the model first.")
+        
+        if len(data) == 0:
+            raise ValueError("No data provided for SHAP explanation")
+        
         # Sample data for explanation
-        sample_data = data.sample(min(max_samples, len(data)))
+        sample_size = min(max_samples, len(data))
+        sample_data = data.sample(sample_size) if sample_size > 0 else data
         
         # Select available features
         available_features = []
@@ -365,13 +372,21 @@ class HybridAISystem:
                 available_features.append(feature)
         
         if not available_features:
-            available_features = ['amount']
+            # Fallback to any numeric columns
+            numeric_cols = sample_data.select_dtypes(include=[np.number]).columns.tolist()
+            if numeric_cols:
+                available_features = numeric_cols[:6]  # Use first 6 numeric columns
+            else:
+                raise ValueError("No suitable features found for SHAP explanation")
         
-        X_sample = sample_data[available_features].values
+        X_sample = sample_data[available_features].fillna(0).values
         X_sample = self.scaler.transform(X_sample)
         
         # Get SHAP values
-        shap_values = self.explainer.shap_values(X_sample)
+        try:
+            shap_values = self.explainer.shap_values(X_sample)
+        except Exception as e:
+            raise ValueError(f"Failed to compute SHAP values: {str(e)}")
         
         # Get predictions
         predictions = self.rf_model.predict_proba(X_sample)[:, 1]

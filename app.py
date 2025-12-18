@@ -350,7 +350,7 @@ if page == "📊 實時監控":
             height=CHART_HEIGHT,
             showlegend=False
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.subheader("🌍 跨境交易分析")
@@ -371,7 +371,7 @@ if page == "📊 實時監控":
             color_discrete_map={'正常': '#4caf50', '欺詐': '#f44336'},
             height=CHART_HEIGHT
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     # Feature importance
     st.subheader("🎯 特徵重要性分析")
@@ -395,7 +395,7 @@ if page == "📊 實時監控":
             height=400,
             showlegend=False
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     # Enhanced Analytics Section
     st.markdown("---")
@@ -470,7 +470,7 @@ if page == "📊 實時監控":
             yaxis_title="小時",
             height=500
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
         st.subheader("🔗 特徵相關性分析")
@@ -505,7 +505,7 @@ if page == "📊 實時監控":
             yaxis_title="特徵",
             height=500
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # Feature importance insights
         st.subheader("💡 關鍵洞察")
@@ -596,7 +596,7 @@ if page == "📊 實時監控":
         )
         
         fig.update_layout(height=600, showlegend=False)
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # Forecasting (simple linear trend)
         st.subheader("🔮 風險預測")
@@ -642,7 +642,7 @@ if page == "📊 實時監控":
                         yaxis_title="平均欺詐風險",
                         height=400
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("數據不足，無法進行預測")
             except Exception as e:
@@ -726,7 +726,7 @@ if page == "📊 實時監控":
             yaxis_title="異常分數",
             height=400
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # Top anomalies
         st.subheader("🚨 高風險異常交易")
@@ -815,7 +815,7 @@ elif page == "🎭 深度偽造檢測":
                     }
                 ))
                 fig.update_layout(height=300)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.subheader("📹 視頻分析")
@@ -860,7 +860,7 @@ elif page == "🎭 深度偽造檢測":
                     }
                 ))
                 fig.update_layout(height=300)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
     
     # Statistics
     st.markdown("---")
@@ -883,7 +883,7 @@ elif page == "🎭 深度偽造檢測":
             color_discrete_sequence=px.colors.qualitative.Set3,
             height=400
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.dataframe(
@@ -1291,7 +1291,7 @@ elif page == "🤝 聯邦學習":
             height=CHART_HEIGHT,
             yaxis=dict(tickformat='.0%', range=[0.85, 1.0])
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         st.success("""
         💡 **聯邦學習效果:**  
@@ -1368,7 +1368,7 @@ elif page == "🧠 混合AI系統":
                     yaxis_title="特徵",
                     height=400
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
         st.subheader("📊 SHAP解釋分析")
@@ -1429,7 +1429,7 @@ elif page == "🧠 混合AI系統":
                         yaxis_title="特徵",
                         height=400
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                     
                     # Individual prediction explanations
                     st.subheader("🔍 個別預測解釋")
@@ -1551,7 +1551,7 @@ elif page == "🧠 混合AI系統":
             yaxis_title="帳戶ID",
             height=400
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with tab4:
         st.subheader("⚡ 實時預測分析")
@@ -1625,7 +1625,7 @@ elif page == "🧠 混合AI系統":
             barmode='group',
             height=400
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
 
 # Footer
 st.markdown("---")

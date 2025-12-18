@@ -6,8 +6,15 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTE
 from config import RANDOM_STATE, SMOTE_K_NEIGHBORS, RF_WEIGHT, GB_WEIGHT
+
+# Try to import SMOTE, but make it optional for compatibility
+try:
+    from imblearn.over_sampling import SMOTE
+    SMOTE_AVAILABLE = True
+except ImportError:
+    SMOTE_AVAILABLE = False
+    print("Warning: imbalanced-learn not available. SMOTE will be disabled. Using class_weight='balanced' instead.")
 
 class EnsembleFraudDetector:
     """
@@ -35,7 +42,10 @@ class EnsembleFraudDetector:
             random_state=RANDOM_STATE
         )
         self.scaler = StandardScaler()
-        self.smote = SMOTE(random_state=RANDOM_STATE, k_neighbors=SMOTE_K_NEIGHBORS)
+        if SMOTE_AVAILABLE:
+            self.smote = SMOTE(random_state=RANDOM_STATE, k_neighbors=SMOTE_K_NEIGHBORS)
+        else:
+            self.smote = None
         self.is_trained = False
         self.feature_names = None
         
@@ -137,13 +147,18 @@ class EnsembleFraudDetector:
         print(f"   Original data: {len(X)} transactions")
         print(f"   Fraud ratio: {y.sum()}/{len(y)} ({y.sum()/len(y)*100:.3f}%)")
         
-        # Apply SMOTE to handle class imbalance
-        try:
-            X_resampled, y_resampled = self.smote.fit_resample(X, y)
-            print(f"   After SMOTE: {len(X_resampled)} transactions")
-            print(f"   Fraud ratio: {y_resampled.sum()}/{len(y_resampled)} ({y_resampled.sum()/len(y_resampled)*100:.1f}%)")
-        except Exception as e:
-            print(f"   SMOTE failed ({e}), using original data")
+        # Apply SMOTE to handle class imbalance (if available)
+        if self.smote is not None:
+            try:
+                X_resampled, y_resampled = self.smote.fit_resample(X, y)
+                print(f"   After SMOTE: {len(X_resampled)} transactions")
+                print(f"   Fraud ratio: {y_resampled.sum()}/{len(y_resampled)} ({y_resampled.sum()/len(y_resampled)*100:.1f}%)")
+            except Exception as e:
+                print(f"   SMOTE failed ({e}), using original data")
+                X_resampled, y_resampled = X, y
+        else:
+            # SMOTE not available, use original data (class_weight='balanced' already handles imbalance)
+            print(f"   SMOTE not available, using original data with class_weight='balanced'")
             X_resampled, y_resampled = X, y
         
         # Scale features
